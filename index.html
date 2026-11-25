@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Alpha Stability" />
-  <title>Alpha Stability — 10s & Ngưỡng Tùy Chỉnh</title>
+  <title>Alpha Stability — 5s / 10s & Ngưỡng Tùy Chỉnh</title>
   <style>
     :root {
       --bg: #0b0e14;
@@ -215,16 +215,16 @@
     <div class="ctrl-row">
       <span class="ctrl-lbl">Khung đo:</span>
       <div class="mini-group">
+        <button class="mini-tab" id="win5" onclick="setWindowSec(5)">5 giây</button>
         <button class="mini-tab active" id="win10" onclick="setWindowSec(10)">10 giây</button>
         <button class="mini-tab" id="win30" onclick="setWindowSec(30)">30 giây</button>
         <button class="mini-tab" id="win60" onclick="setWindowSec(60)">60 giây</button>
-        <button class="mini-tab" id="win120" onclick="setWindowSec(120)">2 phút</button>
         <button class="mini-tab tune-btn" id="btnTune" onclick="toggleTuner()">⚙ Ngưỡng</button>
       </div>
     </div>
 
     <div class="active-rule-bar" id="activeRuleBar">
-      <span>Ngưỡng <b>10s</b>: Biên êm ≤ <b>0.08%</b> • Trượt ≥ <b>-0.03%</b> • Bán ≤ <b>60%</b></span>
+      <span>Ngưỡng <b>10s</b>: Biên êm ≤ <b>0.08%</b> • Trượt ≥ <b>-0.030%</b> • Bán ≤ <b>60%</b></span>
     </div>
 
     <div class="tuner-panel" id="tunerPanel">
@@ -290,20 +290,21 @@
       </div>
 
       <div class="tuner-foot">
-        <div class="tuner-hint">Tự lưu riêng cho từng khung (10s / 30s / 60s / 2p). Khung 10s mặc định siết chặt hơn để bắt nhanh nhịp đứng giá.</div>
+        <div class="tuner-hint">Tự lưu riêng cho từng khung (5s / 10s / 30s / 60s). Khung 5s siết biên chặt hơn để bắt nhịp tức thời.</div>
       </div>
     </div>
   </div>
 
   <div id="mainView"><div class="empty">Đang kết nối WebSocket trực tiếp tới Binance Alpha...</div></div>
-  <div class="diag" id="diagBox">Tối ưu GitHub Pages: Chạy thẳng WebSocket, hỗ trợ khung 10 giây & tùy chỉnh ngưỡng báo ổn định.</div>
+  <div class="diag" id="diagBox">Tối ưu GitHub Pages: Chạy thẳng WebSocket, hỗ trợ khung 5s / 10s / 30s / 60s & tùy chỉnh ngưỡng.</div>
 
   <script>
     const TOKEN_LIST_DIRECT = "https://www.binance.com/bapi/defi/v1/public/wallet-direct/buw/wallet/cex/alpha/all/token/list";
     const STORAGE_KEY = "alpha_stability_selected_v11";
     const CACHE_LIST_KEY = "alpha_stability_token_cache_v11";
-    const WIN_STORAGE_KEY = "alpha_stability_window_v11";
-    const CFG_STORAGE_KEY = "alpha_stability_thresholds_v11";
+    const WIN_STORAGE_KEY = "alpha_stability_window_v12";
+    const CFG_STORAGE_KEY = "alpha_stability_thresholds_v12";
+    const VALID_WINDOWS = [5, 10, 30, 60];
     const IS_STATIC_HOST = /github\.io|gitlab\.io|vercel\.app/i.test(location.hostname) || location.protocol === "file:";
 
     const BUILTIN_TOKENS = [
@@ -311,12 +312,12 @@
       { symbol: "RAVE", alphaId: "ALPHA_497", pair: "ALPHA_497USDT", mulPoint: 4, volume24h: 5e8 }
     ];
 
-    // Bộ ngưỡng mặc định tối ưu riêng cho từng khung thời gian
+    // Bộ ngưỡng mặc định tối ưu riêng cho từng khung (5s / 10s / 30s / 60s)
     const DEFAULT_THRESHOLDS = {
-      10:  { calmRangePct: 0.08, warnRangePct: 0.20, calmDropPct: 0.03, maxSellPct: 60, minCalmScore: 75, minSamples: 3 },
-      30:  { calmRangePct: 0.12, warnRangePct: 0.30, calmDropPct: 0.045, maxSellPct: 62, minCalmScore: 75, minSamples: 4 },
-      60:  { calmRangePct: 0.18, warnRangePct: 0.42, calmDropPct: 0.06, maxSellPct: 62, minCalmScore: 75, minSamples: 4 },
-      120: { calmRangePct: 0.28, warnRangePct: 0.60, calmDropPct: 0.10, maxSellPct: 65, minCalmScore: 72, minSamples: 5 }
+      5:  { calmRangePct: 0.05, warnRangePct: 0.14, calmDropPct: 0.02,  maxSellPct: 60, minCalmScore: 75, minSamples: 2 },
+      10: { calmRangePct: 0.08, warnRangePct: 0.20, calmDropPct: 0.03,  maxSellPct: 60, minCalmScore: 75, minSamples: 3 },
+      30: { calmRangePct: 0.12, warnRangePct: 0.30, calmDropPct: 0.045, maxSellPct: 62, minCalmScore: 75, minSamples: 4 },
+      60: { calmRangePct: 0.18, warnRangePct: 0.42, calmDropPct: 0.06,  maxSellPct: 62, minCalmScore: 75, minSamples: 4 }
     };
 
     let thresholdsByWin = JSON.parse(JSON.stringify(DEFAULT_THRESHOLDS));
@@ -380,11 +381,11 @@
     }
 
     function fmtWinLabel(sec) {
-      return sec === 120 ? "2 phút" : `${sec} giây`;
+      return `${sec} giây`;
     }
 
     function fmtWinShort(sec) {
-      return sec === 120 ? "2p" : `${sec}s`;
+      return `${sec}s`;
     }
 
     function getActiveCfg() {
@@ -403,7 +404,7 @@
         const raw = localStorage.getItem(CFG_STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
-          [10, 30, 60, 120].forEach(w => {
+          VALID_WINDOWS.forEach(w => {
             if (parsed && parsed[w]) {
               thresholdsByWin[w] = { ...DEFAULT_THRESHOLDS[w], ...parsed[w] };
             }
@@ -440,7 +441,7 @@
       cfg.calmDropPct = Math.max(0.005, Math.min(1.0, Number(cfg.calmDropPct) || 0.03));
       cfg.maxSellPct = Math.max(45, Math.min(90, Math.round(Number(cfg.maxSellPct) || 60)));
       cfg.minCalmScore = Math.max(40, Math.min(95, Math.round(Number(cfg.minCalmScore) || 75)));
-      cfg.minSamples = Math.max(2, Math.min(20, Math.round(Number(cfg.minSamples) || 3)));
+      cfg.minSamples = Math.max(2, Math.min(20, Math.round(Number(cfg.minSamples) || 2)));
       return cfg;
     }
 
@@ -574,9 +575,10 @@
     }
 
     function setWindowSec(sec) {
+      if (!VALID_WINDOWS.includes(sec)) sec = 10;
       windowSec = sec;
       try { localStorage.setItem(WIN_STORAGE_KEY, String(sec)); } catch (_) {}
-      [10, 30, 60, 120].forEach(v => {
+      VALID_WINDOWS.forEach(v => {
         const btn = document.getElementById("win" + v);
         if (btn) btn.classList.toggle("active", v === sec);
       });
@@ -978,7 +980,6 @@
       const cfg = getActiveCfg();
       const winShort = fmtWinShort(windowSec);
 
-      // Lọc chính xác theo khung thời gian (đặc biệt khung 10s không lấy trộn lệnh cũ hơn 10s)
       const winTrades = trades.filter(t => t.ts >= cutoff);
       const winPoints = pricePoints.filter(p => p.ts >= cutoff);
 
@@ -1020,7 +1021,6 @@
       const posPct = rangeAbs > 0 ? Math.max(0, Math.min(100, ((currentPrice - minP) / rangeAbs) * 100)) : 50;
       const midPosPct = rangeAbs > 0 ? Math.max(0, Math.min(100, ((meanP - minP) / rangeAbs) * 100)) : 50;
 
-      // Tính điểm ổn định dựa trực tiếp trên bộ ngưỡng người dùng tinh chỉnh cho khung này
       const calmRange = cfg.calmRangePct;
       const warnRange = Math.max(cfg.warnRangePct, calmRange + 0.02);
       const calmDrop = cfg.calmDropPct;
@@ -1074,7 +1074,6 @@
         }
       }
 
-      // Nhãn kiểm tra nhanh 3 tiêu chí theo ngưỡng người dùng đặt
       const rangeChkCls = rangePct <= calmRange ? "chk-ok" : (rangePct <= warnRange ? "chk-warn" : "chk-bad");
       const driftChkCls = driftPct >= -calmDrop ? "chk-ok" : (driftPct >= -warnDrop ? "chk-warn" : "chk-bad");
       const sellChkCls = sellTradePct <= maxSell ? "chk-ok" : (sellTradePct <= maxSell + 10 ? "chk-warn" : "chk-bad");
@@ -1302,10 +1301,10 @@
       loadSavedThresholds();
       try {
         const savedWin = Number(localStorage.getItem(WIN_STORAGE_KEY));
-        if ([10, 30, 60, 120].includes(savedWin)) windowSec = savedWin;
+        if (VALID_WINDOWS.includes(savedWin)) windowSec = savedWin;
       } catch (_) {}
 
-      [10, 30, 60, 120].forEach(v => {
+      VALID_WINDOWS.forEach(v => {
         const btn = document.getElementById("win" + v);
         if (btn) btn.classList.toggle("active", v === windowSec);
       });
@@ -1332,12 +1331,12 @@
       startCoinStream();
       loadTokenList(false);
 
-      // Cập nhật cửa sổ trượt mỗi 1 giây để khung 10s luôn loại bỏ kịp lệnh cũ quá 10 giây
+      // Làm mới cửa sổ trượt mỗi 0.5 giây để khung 5s và 10s loại bỏ kịp lệnh cũ tức thời
       uiClockTimer = setInterval(() => {
         if (!isPaused && selectedToken && (trades.length || latestBook)) {
           renderMainView();
         }
-      }, 1000);
+      }, 500);
     }
 
     bootstrap();
