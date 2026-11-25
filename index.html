@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Alpha Stability" />
+  <title>Alpha Radar — Độ Ổn Định & Sổ Lệnh</title>
+  <style>
+    :root {
+      --bg: #0b0e14;
+      --card: #151b26;
+      --card-2: #0f141e;
+      --border: #242f42;
+      --text: #f0f6fc;
+      --muted: #8b949e;
+      --green: #0ecb81;
+      --green-bg: rgba(14, 203, 129, 0.16);
+      --red: #f6465d;
+      --red-bg: rgba(246, 70, 93, 0.16);
+      --yellow: #f0b90b;
+      --yellow-bg: rgba(240, 185, 11, 0.18);
+      --blue: #38bdf8;
+      --blue-bg: rgba(56, 189, 248, 0.16);
+      --purple: #c084fc;
+      --purple-bg: rgba(192, 132, 252, 0.16);
+    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; background: var(--bg); color: var(--text); padding: env(safe-area-inset-top, 14px) 13px 36px; }
+
+    .header { display: flex; justify-content: space-between; align-items: center; padding: 8px 0 10px; gap: 8px; }
+    .header h1 { margin: 0; font-size: 18px; color: var(--yellow); letter-spacing: -0.3px; display: flex; align-items: center; gap: 6px; }
+    .pill-live { font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 800; background: var(--green-bg); color: var(--green); }
+    .pill-live.rest { background: var(--blue-bg); color: var(--blue); }
+    .pill-live.err { background: var(--red-bg); color: var(--red); }
+    .header .time { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+    .hdr-actions { display: flex; gap: 6px; }
+    .btn { border: none; border-radius: 9px; padding: 8px 11px; font-weight: 700; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+    .btn-primary { background: var(--yellow); color: #000; }
+    .btn-ghost { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+    .btn-paused { background: var(--red-bg); color: var(--red); border: 1px solid rgba(246, 70, 93, 0.45); }
+
+    .picker-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 11px; margin-bottom: 11px; }
+    .picker-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 6px; flex-wrap: wrap; }
+    .picker-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .mini-group { display: flex; gap: 5px; align-items: center; }
+    .mini-tab { background: var(--card-2); border: 1px solid var(--border); color: var(--muted); border-radius: 999px; padding: 4px 9px; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .mini-tab.active { background: var(--yellow); color: #000; border-color: var(--yellow); }
+
+    .input-box, .select-box {
+      width: 100%;
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 11px;
+      border-radius: 10px;
+      font-size: 15px;
+      outline: none;
+    }
+    .input-box { margin-bottom: 7px; }
+    .select-box { font-weight: 700; }
+
+    .quick-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; margin-top: 8px; }
+    .chip { background: var(--card-2); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+    .chip.active { background: var(--yellow); color: #000; border-color: var(--yellow); }
+    .chip .x4 { font-size: 10px; color: var(--yellow); font-weight: 800; }
+    .chip.active .x4 { color: #000; }
+
+    .ctrl-row { display: flex; justify-content: space-between; align-items: center; margin-top: 9px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); gap: 8px; flex-wrap: wrap; }
+    .ctrl-lbl { font-size: 11px; color: var(--muted); }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 13px; margin-bottom: 10px; }
+    .card.CALM { border-color: rgba(14, 203, 129, 0.65); }
+    .card.WARN { border-color: rgba(240, 185, 11, 0.65); }
+    .card.DANGER { border-color: rgba(246, 70, 93, 0.7); }
+
+    .status-banner { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; margin-bottom: 11px; }
+    .status-banner.CALM { background: var(--green-bg); border: 1px solid rgba(14, 203, 129, 0.35); }
+    .status-banner.WARN { background: var(--yellow-bg); border: 1px solid rgba(240, 185, 11, 0.35); }
+    .status-banner.DANGER { background: var(--red-bg); border: 1px solid rgba(246, 70, 93, 0.35); }
+    .status-banner.WAIT { background: rgba(139,148,158,0.14); border: 1px solid rgba(139,148,158,0.28); }
+    .sb-title { font-size: 13.5px; font-weight: 800; }
+    .sb-sub { font-size: 11.5px; color: var(--text); opacity: 0.9; margin-top: 2px; line-height: 1.35; }
+    .score-ring { min-width: 54px; height: 54px; border-radius: 12px; background: rgba(0,0,0,0.32); display: flex; flex-direction: column; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
+    .score-num { font-size: 19px; font-weight: 900; line-height: 1; }
+    .score-lbl { font-size: 9px; color: var(--muted); margin-top: 3px; text-transform: uppercase; }
+
+    .coin-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
+    .coin-name { font-size: 19px; font-weight: 800; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .mul-x4 { background: var(--yellow-bg); color: var(--yellow); border: 1px solid rgba(240, 185, 11, 0.45); font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 800; }
+    .mul { background: var(--blue-bg); color: var(--blue); font-size: 11px; padding: 2px 6px; border-radius: 6px; font-weight: 800; }
+    .pair-tag { font-size: 11px; color: var(--muted); font-weight: 600; }
+    .price-main { font-size: 25px; font-weight: 900; margin-top: 4px; font-variant-numeric: tabular-nums; letter-spacing: -0.4px; }
+    .price-sub { font-size: 11px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+    .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-bottom: 10px; font-variant-numeric: tabular-nums; }
+    .kpi { background: rgba(0,0,0,0.28); border: 1px solid var(--border); border-radius: 11px; padding: 9px 8px; }
+    .kpi .k { font-size: 10px; color: var(--muted); }
+    .kpi .v { font-size: 14px; font-weight: 800; margin-top: 3px; }
+    .kpi .s { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    .section-box { background: rgba(0,0,0,0.26); border: 1px solid var(--border); border-radius: 12px; padding: 10px; margin-bottom: 10px; }
+    .sec-head { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 700; margin-bottom: 7px; gap: 8px; }
+
+    .range-bar-wrap { margin: 6px 0 4px; }
+    .range-prices { display: flex; justify-content: space-between; font-size: 11px; font-variant-numeric: tabular-nums; margin-bottom: 5px; }
+    .range-track { position: relative; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: visible; }
+    .range-mid-mark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--purple); border-radius: 2px; }
+    .range-dot { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; transform: translate(-50%, -50%); border: 2px solid #0b0e14; }
+
+    .spark-wrap { margin-top: 8px; background: rgba(0,0,0,0.28); border-radius: 8px; padding: 4px; }
+    .spark-wrap svg { display: block; width: 100%; height: 62px; }
+
+    .imb-bar { display: flex; height: 9px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,0.07); }
+    .imb-bid { background: var(--green); transition: width 0.25s ease; }
+    .imb-ask { background: var(--red); transition: width 0.25s ease; }
+    .imb-sub { display: flex; justify-content: space-between; font-size: 11px; margin-top: 5px; font-variant-numeric: tabular-nums; gap: 6px; }
+
+    .sub-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+    .sub-tab { flex: 1; text-align: center; background: var(--card-2); border: 1px solid var(--border); color: var(--muted); padding: 7px 8px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .sub-tab.active { background: var(--blue-bg); color: var(--blue); border-color: rgba(56, 189, 248, 0.45); }
+
+    .tape-list { max-height: 245px; overflow-y: auto; font-variant-numeric: tabular-nums; }
+    .tape-head, .tape-row { display: grid; grid-template-columns: 1.35fr 0.9fr 0.85fr 0.7fr; gap: 4px; align-items: center; padding: 4px 4px; font-size: 11.5px; }
+    .tape-head { font-size: 10px; color: var(--muted); font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 5px; margin-bottom: 3px; }
+    .tape-row { border-radius: 5px; }
+    .tape-row:nth-child(even) { background: rgba(255,255,255,0.02); }
+    .r-right { text-align: right; }
+
+    .ob-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .ob-col-lbl { font-size: 10px; color: var(--muted); margin-bottom: 4px; font-weight: 700; display: flex; justify-content: space-between; }
+    .ob-row { position: relative; display: flex; justify-content: space-between; gap: 4px; padding: 4px 5px; border-radius: 5px; overflow: hidden; margin-bottom: 2px; }
+    .ob-bg { position: absolute; top: 0; bottom: 0; opacity: 0.16; pointer-events: none; }
+    .ob-bg.bid { right: 0; background: var(--green); }
+    .ob-bg.ask { left: 0; background: var(--red); }
+    .ob-row span { position: relative; z-index: 1; }
+
+    .ref-note { font-size: 11px; color: var(--muted); line-height: 1.45; margin-top: 6px; }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+    .pur { color: var(--purple); }
+    .blu { color: var(--blue); }
+    .yel { color: var(--yellow); }
+    .empty { text-align: center; color: var(--muted); padding: 26px 14px; font-size: 13px; line-height: 1.55; background: var(--card); border: 1px solid var(--border); border-radius: 14px; }
+    .diag { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.45; word-break: break-word; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>ALPHA STABILITY <span class="pill-live rest" id="connPill">ĐANG NỐI</span></h1>
+      <div class="time" id="updateTime">Đang tải danh sách coin...</div>
+    </div>
+    <div class="hdr-actions">
+      <button class="btn btn-ghost" id="btnPause" onclick="togglePause()">Tạm dừng</button>
+      <button class="btn btn-primary" onclick="resetWindow()">Đặt lại</button>
+    </div>
+  </div>
+
+  <div class="picker-card">
+    <div class="picker-top">
+      <div class="picker-title">Chọn đúng 1 coin theo dõi</div>
+      <div class="mini-group">
+        <button class="mini-tab active" id="listX4" onclick="setListFilter('X4')">Coin x4 (<span id="x4Total">0</span>)</button>
+        <button class="mini-tab" id="listALL" onclick="setListFilter('ALL')">Tất cả (<span id="allTotal">0</span>)</button>
+        <button class="mini-tab" onclick="loadTokenList(true)">Tải DS</button>
+      </div>
+    </div>
+
+    <input type="search" class="input-box" id="coinSearch" placeholder="Tìm tên coin (VD: UP, RAVE)..." oninput="renderPicker()" />
+
+    <select class="select-box" id="coinSelect" onchange="onSelectCoin(this.value)">
+      <option value="">Đang tải danh sách Binance Alpha...</option>
+    </select>
+
+    <div class="quick-chips" id="quickChips"></div>
+
+    <div class="ctrl-row">
+      <span class="ctrl-lbl">Khung đo độ ổn định:</span>
+      <div class="mini-group">
+        <button class="mini-tab" id="win30" onclick="setWindowSec(30)">30 giây</button>
+        <button class="mini-tab active" id="win60" onclick="setWindowSec(60)">60 giây</button>
+        <button class="mini-tab" id="win120" onclick="setWindowSec(120)">2 phút</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mainView"><div class="empty">Đang tải danh sách coin Binance Alpha...</div></div>
+  <div class="diag" id="diagBox">Ưu tiên kết nối WebSocket trực tiếp (khớp y hệt cột giao dịch trên app Binance).</div>
+
+  <script>
+    const TOKEN_LIST_DIRECT = "https://www.binance.com/bapi/defi/v1/public/wallet-direct/buw/wallet/cex/alpha/all/token/list";
+    const STORAGE_KEY = "alpha_stability_selected_v8";
+
+    let allTokens = [];
+    let listFilter = "X4";
+    let selectedToken = null;
+    let windowSec = 60;
+    let activePanel = "TAPE"; // TAPE (lệnh khớp xanh/đỏ như ảnh) | BOOK (sổ lệnh Top 5)
+    let isPaused = false;
+
+    // Dữ liệu thời gian thực của ĐÚNG 1 COIN đang chọn
+    let trades = [];      // [{ id, price, qty, usd, isSell, ts }]
+    let pricePoints = []; // [{ ts, price }] dùng vẽ biểu đồ & đo biến động
+    let latestBook = null; // { bestBid, bestAsk, bids, asks, bidDepth5, askDepth5, bidRatio, spreadPct, crossed, ts }
+    let latestKlinePrice = 0;
+
+    // Kết nối WebSocket + dự phòng REST
+    let ws = null;
+    let wsConnected = false;
+    let wsGotMessage = false;
+    let wsFallbackTimer = null;
+    let restTimer = null;
+    let isRestBusy = false;
+    let activeSource = "Khởi tạo";
+    let lastErrorText = "";
+    let renderScheduled = false;
+    let lastRenderTs = 0;
+
+    function fmtPrice(p, withDollar = false) {
+      if (!Number.isFinite(p) || p <= 0) return "-";
+      let s;
+      if (p >= 100) s = p.toFixed(4);
+      else if (p >= 10) s = p.toFixed(5);
+      else if (p >= 1) s = p.toFixed(6);
+      else s = p.toFixed(8);
+      return withDollar ? "$" + s : s;
+    }
+
+    function fmtQty(q) {
+      if (!Number.isFinite(q) || q <= 0) return "0";
+      if (q >= 1000000) return (q / 1000000).toFixed(2) + "M";
+      if (q >= 1000) return (q / 1000).toFixed(2) + "K";
+      return q.toFixed(1);
+    }
+
+    function fmtUsd(v) {
+      if (!Number.isFinite(v) || v < 0) return "$0";
+      if (v >= 1000000) return "$" + (v / 1000000).toFixed(2) + "M";
+      if (v >= 10000) return "$" + (v / 1000).toFixed(1) + "K";
+      return "$" + Math.round(v).toLocaleString();
+    }
+
+    function fmtTime(ts) {
+      const d = new Date(ts);
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mm = String(d.getMinutes()).padStart(2, "0");
+      const ss = String(d.getSeconds()).padStart(2, "0");
+      return `${hh}:${mm}:${ss}`;
+    }
+
+    function setConnBadge(text, cls) {
+      const el = document.getElementById("connPill");
+      el.innerText = text;
+      el.className = "pill-live" + (cls ? " " + cls : "");
+    }
+
+    async function fetchJsonWithFallback(directPath, binanceDirectUrl) {
+      const candidates = [
+        directPath,
+        `https://corsproxy.io/?${encodeURIComponent(binanceDirectUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(binanceDirectUrl)}`
+      ];
+      let lastErr = null;
+      for (const u of candidates) {
+        try {
+          const res = await fetch(u, { cache: "no-store" });
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const json = await res.json();
+          if (json && (json.data !== undefined || Array.isArray(json.bids) || Array.isArray(json))) {
+            return { json, source: u.startsWith("/") ? "Netlify _redirects" : new URL(u).hostname };
+          }
+          throw new Error("Dữ liệu rỗng");
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+      throw lastErr || new Error("Không kết nối được");
+    }
+
+    function setListFilter(mode) {
+      listFilter = mode;
+      document.getElementById("listX4").classList.toggle("active", mode === "X4");
+      document.getElementById("listALL").classList.toggle("active", mode === "ALL");
+      renderPicker();
+    }
+
+    function setWindowSec(sec) {
+      windowSec = sec;
+      [30, 60, 120].forEach(v => {
+        document.getElementById("win" + v).classList.toggle("active", v === sec);
+      });
+      scheduleRender(true);
+    }
+
+    function setActivePanel(p) {
+      activePanel = p;
+      scheduleRender(true);
+    }
+
+    function togglePause() {
+      isPaused = !isPaused;
+      const btn = document.getElementById("btnPause");
+      btn.innerText = isPaused ? "Tiếp tục" : "Tạm dừng";
+      btn.className = isPaused ? "btn btn-paused" : "btn btn-ghost";
+      if (!isPaused && selectedToken) {
+        if (!wsConnected && !restTimer) startCoinStream();
+        scheduleRender(true);
+      }
+    }
+
+    function resetWindow() {
+      trades = [];
+      pricePoints = [];
+      latestBook = null;
+      lastErrorText = "";
+      if (selectedToken) {
+        document.getElementById("mainView").innerHTML =
+          `<div class="empty">Đã đặt lại bộ đo. Đang đọc dữ liệu mới cho <b>${selectedToken.symbol}</b>...</div>`;
+        startCoinStream();
+      }
+    }
+
+    function getFilteredTokens() {
+      const q = (document.getElementById("coinSearch").value || "").trim().toUpperCase();
+      return allTokens.filter(t => {
+        if (listFilter === "X4" && t.mulPoint < 4) return false;
+        if (q && !t.symbol.toUpperCase().includes(q) && !t.alphaId.toUpperCase().includes(q)) return false;
+        return true;
+      });
+    }
+
+    function renderPicker() {
+      const list = getFilteredTokens();
+      const select = document.getElementById("coinSelect");
+
+      if (!list.length) {
+        select.innerHTML = `<option value="">Không tìm thấy coin phù hợp...</option>`;
+      } else {
+        select.innerHTML = list.map(t => {
+          const mulTag = t.mulPoint > 1 ? ` [x${t.mulPoint}]` : "";
+          const isSel = selectedToken && selectedToken.alphaId === t.alphaId ? "selected" : "";
+          return `<option value="${t.alphaId}" ${isSel}>${t.symbol}${mulTag} — ${t.pair}</option>`;
+        }).join("");
+
+        if (selectedToken && !list.some(t => t.alphaId === selectedToken.alphaId)) {
+          const opt = document.createElement("option");
+          opt.value = selectedToken.alphaId;
+          opt.text = `Đang xem: ${selectedToken.symbol}${selectedToken.mulPoint > 1 ? ` [x${selectedToken.mulPoint}]` : ""} — ${selectedToken.pair}`;
+          opt.selected = true;
+          select.insertBefore(opt, select.firstChild);
+        }
+      }
+
+      const x4List = allTokens.filter(t => t.mulPoint >= 4).slice(0, 14);
+      const chipsSource = x4List.length ? x4List : allTokens.slice(0, 10);
+      document.getElementById("quickChips").innerHTML = chipsSource.map(t => {
+        const active = selectedToken && selectedToken.alphaId === t.alphaId ? "active" : "";
+        return `<button class="chip ${active}" onclick="onSelectCoin('${t.alphaId}')">${t.symbol}${t.mulPoint >= 4 ? '<span class="x4">x4</span>' : ''}</button>`;
+      }).join("");
+    }
+
+    function onSelectCoin(alphaId) {
+      if (!alphaId) return;
+      const found = allTokens.find(t => t.alphaId === alphaId);
+      if (!found) return;
+      selectedToken = found;
+      trades = [];
+      pricePoints = [];
+      latestBook = null;
+      latestKlinePrice = 0;
+      lastErrorText = "";
+      try { localStorage.setItem(STORAGE_KEY, found.alphaId); } catch (_) {}
+      renderPicker();
+      document.getElementById("mainView").innerHTML =
+        `<div class="empty">Đang kết nối dữ liệu khớp lệnh & sổ lệnh cho <b>${found.symbol}</b> (${found.pair})...</div>`;
+      startCoinStream();
+    }
+
+    function stopCoinStream() {
+      if (wsFallbackTimer) { clearTimeout(wsFallbackTimer); wsFallbackTimer = null; }
+      if (restTimer) { clearInterval(restTimer); restTimer = null; }
+      if (ws) {
+        try { ws.onclose = null; ws.onerror = null; ws.onmessage = null; ws.close(); } catch (_) {}
+        ws = null;
+      }
+      wsConnected = false;
+      wsGotMessage = false;
+    }
+
+    function ingestTrade(id, price, qty, isSell, ts) {
+      if (!Number.isFinite(price) || price <= 0) return;
+      const tradeTs = Number.isFinite(ts) && ts > 0 ? ts : Date.now();
+      const tradeId = String(id || `${tradeTs}_${price}_${qty}`);
+      if (trades.length && trades.some(x => x.id === tradeId)) return;
+
+      const qtyNum = Number.isFinite(qty) && qty > 0 ? qty : 0;
+      trades.push({
+        id: tradeId,
+        price,
+        qty: qtyNum,
+        usd: price * qtyNum,
+        isSell: Boolean(isSell),
+        ts: tradeTs
+      });
+      // Giữ lịch sử tối đa 5 phút hoặc 600 lệnh gần nhất
+      const cutoff = Date.now() - 300000;
+      if (trades.length > 600) trades = trades.slice(-600);
+      while (trades.length > 80 && trades[0].ts < cutoff) trades.shift();
+
+      pricePoints.push({ ts: tradeTs, price });
+      if (pricePoints.length > 600) pricePoints = pricePoints.slice(-600);
+      while (pricePoints.length > 80 && pricePoints[0].ts < cutoff) pricePoints.shift();
+    }
+
+    function ingestBook(rawBids, rawAsks, refPrice) {
+      if (!Array.isArray(rawBids) || !Array.isArray(rawAsks)) return;
+      let bids = rawBids.map(x => [Number(x[0]), Number(x[1])]).filter(x => x[0] > 0 && x[1] > 0).sort((a, b) => b[0] - a[0]);
+      let asks = rawAsks.map(x => [Number(x[0]), Number(x[1])]).filter(x => x[0] > 0 && x[1] > 0).sort((a, b) => a[0] - b[0]);
+      if (!bids.length || !asks.length) return;
+
+      // Nếu đã có giá khớp thật, lọc bớt các mức giá lệch quá xa (>15%) để tránh nhiễu
+      if (refPrice > 0) {
+        const cleanBids = bids.filter(x => Math.abs(x[0] - refPrice) / refPrice <= 0.15);
+        const cleanAsks = asks.filter(x => Math.abs(x[0] - refPrice) / refPrice <= 0.15);
+        if (cleanBids.length) bids = cleanBids;
+        if (cleanAsks.length) asks = cleanAsks;
+      }
+
+      const bestBid = bids[0][0];
+      const bestAsk = asks[0][0];
+      const crossed = bestAsk < bestBid;
+      const spreadPct = bestBid > 0 ? ((bestAsk - bestBid) / bestBid) * 100 : 0;
+      const topBids = bids.slice(0, 5);
+      const topAsks = asks.slice(0, 5);
+      const bidDepth5 = topBids.reduce((s, x) => s + x[0] * x[1], 0);
+      const askDepth5 = topAsks.reduce((s, x) => s + x[0] * x[1], 0);
+      const total = bidDepth5 + askDepth5;
+      const bidRatio = total > 0 ? (bidDepth5 / total) * 100 : 50;
+
+      latestBook = {
+        bestBid,
+        bestAsk,
+        bids: topBids,
+        asks: topAsks,
+        bidDepth5,
+        askDepth5,
+        bidRatio,
+        bidAskRatioText: askDepth5 > 0 ? (bidDepth5 / askDepth5).toFixed(2) + "x" : "MAX",
+        spreadPct,
+        crossed,
+        ts: Date.now()
+      };
+
+      // Chỉ dùng giá giữa sổ lệnh cho biểu đồ nếu chưa có bất kỳ lệnh khớp thật nào và sổ lệnh không bị chéo
+      if (!trades.length && !crossed) {
+        const mid = (bestBid + bestAsk) / 2;
+        pricePoints.push({ ts: Date.now(), price: mid });
+        if (pricePoints.length > 300) pricePoints.shift();
+      }
+    }
+
+    function startCoinStream() {
+      stopCoinStream();
+      if (!selectedToken) return;
+
+      const pair = selectedToken.pair;
+      const pairLower = pair.toLowerCase();
+      setConnBadge("ĐANG NỐI WS", "rest");
+      document.getElementById("updateTime").innerText = `Đang nối luồng trực tiếp cho ${selectedToken.symbol}...`;
+
+      // Tải nhanh snapshot ban đầu (lịch sử khớp + sổ lệnh) để có số liệu ngay lập tức không phải chờ
+      pollRestOnce(true);
+
+      // Ưu tiên WebSocket trực tiếp của Binance Alpha (không qua proxy)
+      try {
+        const wsUrl = `wss://nbstream.binance.com/w3w/wsa/stream?streams=${pairLower}@aggTrade/${pairLower}@depth5@100ms`;
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          wsConnected = true;
+          activeSource = "WebSocket trực tiếp Binance";
+          setConnBadge("LIVE WS", "");
+          // Gửi thêm lệnh SUBSCRIBE dự phòng nếu endpoint yêu cầu subscribe tường minh
+          try {
+            ws.send(JSON.stringify({
+              method: "SUBSCRIBE",
+              params: [`${pairLower}@aggTrade`, `${pairLower}@depth5@100ms`],
+              id: 1
+            }));
+          } catch (_) {}
+        };
+
+        ws.onmessage = (ev) => {
+          if (isPaused) return;
+          try {
+            const msg = JSON.parse(ev.data);
+            const streamName = String(msg.stream || "").toLowerCase();
+            const payload = msg.data || msg;
+            if (!payload || payload.result === null) return;
+
+            wsGotMessage = true;
+            activeSource = "WebSocket trực tiếp Binance";
+            setConnBadge("LIVE WS", "");
+            if (wsFallbackTimer) { clearTimeout(wsFallbackTimer); wsFallbackTimer = null; }
+
+            if (streamName.includes("aggtrade") || payload.e === "aggTrade" || (payload.p && payload.q && payload.T)) {
+              ingestTrade(
+                payload.a || payload.t,
+                Number(payload.p),
+                Number(payload.q),
+                Boolean(payload.m),
+                Number(payload.T || payload.E || Date.now())
+              );
+              scheduleRender();
+            } else if (streamName.includes("depth") || payload.bids || payload.b) {
+              const refP = trades.length ? trades[trades.length - 1].price : latestKlinePrice;
+              ingestBook(payload.bids || payload.b, payload.asks || payload.a, refP);
+              scheduleRender();
+            }
+          } catch (_) {}
+        };
+
+        ws.onerror = () => {
+          wsConnected = false;
+          activateRestFallback();
+        };
+
+        ws.onclose = () => {
+          wsConnected = false;
+          if (!isPaused) activateRestFallback();
+        };
+      } catch (_) {
+        activateRestFallback();
+      }
+
+      // Nếu sau 4.5 giây WebSocket chưa nhận được gói tin nào, tự chuyển sang REST polling
+      wsFallbackTimer = setTimeout(() => {
+        if (!wsGotMessage) activateRestFallback();
+      }, 4500);
+    }
+
+    function activateRestFallback() {
+      if (restTimer) return;
+      setConnBadge("REST 2S", "rest");
+      pollRestOnce(false);
+      restTimer = setInterval(() => {
+        if (!isPaused && !wsGotMessage) pollRestOnce(false);
+      }, 2000);
+    }
+
+    async function pollRestOnce(isInitial) {
+      if (isRestBusy || !selectedToken) return;
+      if (isPaused && !isInitial) return;
+      isRestBusy = true;
+      const pair = selectedToken.pair;
+      let gotAny = false;
+      let errMsg = "";
+
+      try {
+        // 1. Thử lấy bảng lệnh khớp thật (agg-trades)
+        try {
+          const aggDirect = `https://www.binance.com/bapi/defi/v1/public/alpha-trade/agg-trades?symbol=${encodeURIComponent(pair)}&limit=60`;
+          const resAgg = await fetchJsonWithFallback(`/api/alpha/agg-trades?symbol=${encodeURIComponent(pair)}&limit=60`, aggDirect);
+          const arr = Array.isArray(resAgg.json.data) ? resAgg.json.data : (Array.isArray(resAgg.json) ? resAgg.json : []);
+          if (arr.length) {
+            arr.sort((a, b) => Number(a.T || a.time || 0) - Number(b.T || b.time || 0));
+            for (const item of arr) {
+              ingestTrade(
+                item.a || item.id,
+                Number(item.p || item.price),
+                Number(item.q || item.qty),
+                Boolean(item.m !== undefined ? item.m : item.isBuyerMaker),
+                Number(item.T || item.time || Date.now())
+              );
+            }
+            if (!wsGotMessage) activeSource = `REST agg-trades (${resAgg.source})`;
+            gotAny = true;
+          }
+        } catch (e) {
+          errMsg = e.message;
+        }
+
+        // 2. Lấy thêm sổ lệnh (fullDepth) và kline gần nhất (đều đã có sẵn trong _redirects cũ)
+        const depthDirect = `https://www.binance.com/bapi/defi/v1/public/alpha-trade/fullDepth?symbol=${encodeURIComponent(pair)}&limit=20`;
+        const klineDirect = `https://www.binance.com/bapi/defi/v1/public/alpha-trade/klines?symbol=${encodeURIComponent(pair)}&interval=1m&limit=5`;
+
+        const [kRes, dRes] = await Promise.allSettled([
+          fetchJsonWithFallback(`/api/alpha/klines?symbol=${encodeURIComponent(pair)}&interval=1m&limit=5`, klineDirect),
+          fetchJsonWithFallback(`/api/alpha/depth?symbol=${encodeURIComponent(pair)}&limit=20`, depthDirect)
+        ]);
+
+        if (kRes.status === "fulfilled") {
+          const kArr = Array.isArray(kRes.value.json.data) ? kRes.value.json.data : [];
+          if (kArr.length) {
+            const lastK = kArr[kArr.length - 1];
+            const closeP = Number(lastK[4]);
+            if (closeP > 0) {
+              latestKlinePrice = closeP;
+              if (!trades.length) {
+                pricePoints.push({ ts: Date.now(), price: closeP });
+                if (pricePoints.length > 300) pricePoints.shift();
+              }
+              if (!wsGotMessage && !gotAny) activeSource = `REST klines+depth (${kRes.value.source})`;
+              gotAny = true;
+            }
+          }
+        }
+
+        if (dRes.status === "fulfilled") {
+          const dData = dRes.value.json.data || dRes.value.json || {};
+          const refP = trades.length ? trades[trades.length - 1].price : latestKlinePrice;
+          ingestBook(dData.bids || [], dData.asks || [], refP);
+          if (!wsGotMessage && !gotAny) activeSource = `REST depth (${dRes.value.source})`;
+          gotAny = true;
+        }
+
+        if (!gotAny) {
+          throw new Error(errMsg || "Không đọc được dữ liệu Binance Alpha");
+        }
+
+        lastErrorText = "";
+        scheduleRender(true);
+      } catch (e) {
+        lastErrorText = e && e.message ? e.message : "Lỗi kết nối";
+        if (!wsGotMessage) {
+          setConnBadge("LỖI NỐI", "err");
+          document.getElementById("updateTime").innerText = `Lỗi đọc dữ liệu ${selectedToken.symbol}`;
+        }
+        if (!trades.length && !latestBook) {
+          document.getElementById("mainView").innerHTML =
+            `<div class="empty">Chưa lấy được dữ liệu cho <b>${selectedToken.symbol}</b> (${pair}).<br><span class="neg">Chi tiết: ${lastErrorText}</span><br>Hãy kiểm tra lại file <b>_redirects</b> rồi bấm <b>Đặt lại</b>.</div>`;
+        }
+      } finally {
+        isRestBusy = false;
+      }
+    }
+
+    function scheduleRender(immediate = false) {
+      const now = Date.now();
+      if (immediate || now - lastRenderTs >= 250) {
+        renderScheduled = false;
+        lastRenderTs = now;
+        renderMainView();
+        return;
+      }
+      if (renderScheduled) return;
+      renderScheduled = true;
+      setTimeout(() => {
+        renderScheduled = false;
+        lastRenderTs = Date.now();
+        renderMainView();
+      }, 250);
+    }
+
+    function renderSparkline(pts, meanPrice) {
+      const slice = pts.slice(-80);
+      if (slice.length < 2) return "";
+      const vals = slice.map(x => x.price);
+      let minP = Math.min(...vals, meanPrice);
+      let maxP = Math.max(...vals, meanPrice);
+      if (maxP - minP < meanPrice * 0.00005) {
+        minP = meanPrice * 0.99995;
+        maxP = meanPrice * 1.00005;
+      }
+      const w = 300, h = 62, pad = 6;
+      const toY = (p) => pad + ((maxP - p) / (maxP - minP)) * (h - pad * 2);
+      const toX = (i) => pad + (i / (slice.length - 1)) * (w - pad * 2);
+      const linePts = vals.map((p, i) => `${toX(i).toFixed(1)},${toY(p).toFixed(1)}`).join(" ");
+      const meanY = toY(meanPrice).toFixed(1);
+      const lastP = vals[vals.length - 1];
+      const pctFromMean = meanPrice > 0 ? Math.abs((lastP - meanPrice) / meanPrice) * 100 : 0;
+      const color = pctFromMean <= 0.08 ? "#0ecb81" : (lastP >= meanPrice ? "#38bdf8" : "#f6465d");
+
+      return `
+        <div class="spark-wrap">
+          <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+            <line x1="0" y1="${meanY}" x2="${w}" y2="${meanY}" stroke="#c084fc" stroke-width="1" stroke-dasharray="4 3" opacity="0.7" />
+            <polyline fill="none" stroke="${color}" stroke-width="2" points="${linePts}" />
+            <circle cx="${toX(vals.length - 1).toFixed(1)}" cy="${toY(lastP).toFixed(1)}" r="3.4" fill="${color}" />
+          </svg>
+        </div>
+      `;
+    }
+
+    function renderMainView() {
+      if (!selectedToken) return;
+      const now = Date.now();
+      const cutoff = now - windowSec * 1000;
+
+      // Lọc các lệnh và điểm giá trong đúng khung thời gian đang chọn (30s / 60s / 2 phút)
+      const winTrades = trades.filter(t => t.ts >= cutoff);
+      const recentTrades = winTrades.length >= 3 ? winTrades : trades.slice(-30);
+      const winPoints = pricePoints.filter(p => p.ts >= cutoff);
+      const activePoints = winPoints.length >= 2 ? winPoints : pricePoints.slice(-30);
+
+      const lastTrade = trades.length ? trades[trades.length - 1] : null;
+      const currentPrice = lastTrade
+        ? lastTrade.price
+        : (latestKlinePrice > 0
+            ? latestKlinePrice
+            : (latestBook ? (latestBook.bestBid + latestBook.bestAsk) / 2 : 0));
+
+      if (!currentPrice) return;
+
+      const vals = activePoints.length ? activePoints.map(x => x.price) : [currentPrice];
+      const maxP = Math.max(...vals);
+      const minP = Math.min(...vals);
+      const meanP = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const rangeAbs = maxP - minP;
+      const rangePct = minP > 0 ? (rangeAbs / minP) * 100 : 0;
+      const devMeanPct = meanP > 0 ? ((currentPrice - meanP) / meanP) * 100 : 0;
+
+      // Tính độ lệch chuẩn (volatility) & tốc độ đổi hướng (dao động qua lại)
+      const variance = vals.reduce((s, v) => s + Math.pow(((v - meanP) / meanP) * 100, 2), 0) / vals.length;
+      const stdPct = Math.sqrt(variance);
+
+      // Xu hướng ngắn hạn: so sánh nửa đầu và nửa sau của khung thời gian
+      const halfIdx = Math.max(1, Math.floor(vals.length / 2));
+      const firstAvg = vals.slice(0, halfIdx).reduce((a, b) => a + b, 0) / halfIdx;
+      const secondAvg = vals.slice(halfIdx).reduce((a, b) => a + b, 0) / Math.max(1, vals.length - halfIdx);
+      const driftPct = firstAvg > 0 ? ((secondAvg - firstAvg) / firstAvg) * 100 : 0;
+
+      // Tỷ lệ mua / bán khớp thật trong khung thời gian
+      const buyUsd = recentTrades.filter(t => !t.isSell).reduce((s, t) => s + t.usd, 0);
+      const sellUsd = recentTrades.filter(t => t.isSell).reduce((s, t) => s + t.usd, 0);
+      const totalTradeUsd = buyUsd + sellUsd;
+      const buyTradePct = totalTradeUsd > 0 ? (buyUsd / totalTradeUsd) * 100 : 50;
+      const sellTradePct = 100 - buyTradePct;
+
+      // Đếm lệnh khớp trong 15 giây gần nhất (đo độ sôi động)
+      const trades15s = trades.filter(t => t.ts >= now - 15000).length;
+
+      // Vị trí giá hiện tại trong biên Min - Max (0% = sát đáy, 100% = sát đỉnh)
+      const posPct = rangeAbs > 0 ? Math.max(0, Math.min(100, ((currentPrice - minP) / rangeAbs) * 100)) : 50;
+      const midPosPct = rangeAbs > 0 ? Math.max(0, Math.min(100, ((meanP - minP) / rangeAbs) * 100)) : 50;
+
+      // Tính ĐIỂM ỔN ĐỊNH (0 - 100) chuyên cho kiểu chạy Lệnh đảo ngược sát biên
+      let score = 100;
+      // 1. Trừ điểm theo biên độ % trong khung đo
+      if (rangePct > 0.08) score -= Math.min(45, (rangePct - 0.08) * 110);
+      // 2. Trừ điểm theo độ trượt xu hướng (nếu đang tụt nền mạnh thì trừ nặng hơn)
+      if (driftPct < -0.04) score -= Math.min(30, Math.abs(driftPct) * 180);
+      else if (Math.abs(driftPct) > 0.08) score -= Math.min(15, Math.abs(driftPct) * 70);
+      // 3. Trừ điểm nếu lực bán khớp áp đảo mạnh
+      if (totalTradeUsd > 0 && sellTradePct > 62) score -= Math.min(25, (sellTradePct - 62) * 1.1);
+      // 4. Trừ điểm nếu giá hiện tại đang ép sát đáy khung (< 15%) và bị trượt âm
+      if (posPct < 15 && driftPct < -0.03) score -= 12;
+      // 5. Trừ điểm nếu có sổ lệnh bị giãn spread lớn
+      if (latestBook && !latestBook.crossed && latestBook.spreadPct > 0.25) {
+        score -= Math.min(15, (latestBook.spreadPct - 0.25) * 40);
+      }
+      score = Math.max(0, Math.min(100, Math.round(score)));
+
+      let state = "WAIT";
+      let bannerTitle = "ĐANG GOM DỮ LIỆU ĐO ĐỘ ỔN ĐỊNH";
+      let bannerSub = `Đã ghi nhận ${vals.length} mốc giá. Chờ vài giây để đủ dữ liệu đánh giá.`;
+
+      if (vals.length >= 4) {
+        if (score >= 75 && rangePct <= 0.18 && driftPct > -0.06) {
+          state = "CALM";
+          bannerTitle = "GIÁ RẤT ÊM — PHÙ HỢP CANH ĐẢO NGƯỢC";
+          bannerSub = `Biên ${windowSec}s chỉ ${rangePct.toFixed(3)}%, giá neo gọn quanh ${fmtPrice(meanP)}. Dễ đặt mua/bán sát biên ít trượt.`;
+        } else if (score >= 48 && rangePct <= 0.42 && driftPct > -0.15) {
+          state = "WARN";
+          bannerTitle = "BIẾN ĐỘNG NHẸ — CẨN TRỌNG BƯỚC GIÁ";
+          bannerSub = `Biên ${windowSec}s đạt ${rangePct.toFixed(3)}% (trượt ${driftPct >= 0 ? '+' : ''}${driftPct.toFixed(3)}%). Nên nới nhẹ biên giá bán hoặc chờ giá bó hẹp lại.`;
+        } else {
+          state = "DANGER";
+          bannerTitle = "GIÁ ĐANG GIẬT / TRƯỢT NỀN — NÊN CHỜ";
+          bannerSub = `Biên ${windowSec}s rộng ${rangePct.toFixed(3)}% hoặc lực bán áp đảo (${sellTradePct.toFixed(0)}%). Dễ bị hụt lệnh đảo ngược nếu vào lúc này.`;
+        }
+      }
+
+      // Nội dung bảng dưới: Tab 1 = Bảng lệnh khớp xanh/đỏ (giống ảnh Binance), Tab 2 = Sổ lệnh Top 5 Bid/Ask
+      let bottomPanelHtml = "";
+      if (activePanel === "TAPE") {
+        const displayTrades = [...trades].reverse().slice(0, 22);
+        if (!displayTrades.length) {
+          bottomPanelHtml = `<div class="ref-note">Đang chờ gói lệnh khớp trực tiếp (aggTrade)... Bạn có thể bấm sang tab <b>Sổ lệnh Top 5</b> để xem lệnh chờ.</div>`;
+        } else {
+          bottomPanelHtml = `
+            <div class="tape-head">
+              <span>Giá khớp (USDT)</span>
+              <span class="r-right">SL (${selectedToken.symbol})</span>
+              <span class="r-right">Giá trị</span>
+              <span class="r-right">Giờ</span>
+            </div>
+            <div class="tape-list">
+              ${displayTrades.map(t => `
+                <div class="tape-row">
+                  <span class="${t.isSell ? 'neg' : 'pos'}" style="font-weight:700">${fmtPrice(t.price)}</span>
+                  <span class="r-right">${fmtQty(t.qty)}</span>
+                  <span class="r-right" style="color:var(--muted)">${fmtUsd(t.usd)}</span>
+                  <span class="r-right" style="color:var(--muted)">${fmtTime(t.ts).slice(3)}</span>
+                </div>
+              `).join("")}
+            </div>
+          `;
+        }
+      } else {
+        if (!latestBook) {
+          bottomPanelHtml = `<div class="ref-note">Chưa nhận được sổ lệnh Top 5 cho cặp này.</div>`;
+        } else {
+          const maxBidUsd = Math.max(...latestBook.bids.map(b => b[0] * b[1]), 1);
+          const maxAskUsd = Math.max(...latestBook.asks.map(a => a[0] * a[1]), 1);
+          const bidsHtml = latestBook.bids.map(b => {
+            const usd = b[0] * b[1];
+            const w = Math.min(100, (usd / maxBidUsd) * 100).toFixed(0);
+            return `<div class="ob-row"><div class="ob-bg bid" style="width:${w}%"></div><span class="pos">${fmtPrice(b[0])}</span><span>${fmtUsd(usd)}</span></div>`;
+          }).join("");
+          const asksHtml = latestBook.asks.map(a => {
+            const usd = a[0] * a[1];
+            const w = Math.min(100, (usd / maxAskUsd) * 100).toFixed(0);
+            return `<div class="ob-row"><div class="ob-bg ask" style="width:${w}%"></div><span class="neg">${fmtPrice(a[0])}</span><span>${fmtUsd(usd)}</span></div>`;
+          }).join("");
+
+          bottomPanelHtml = `
+            <div class="imb-bar" style="margin-bottom:5px">
+              <div class="imb-bid" style="width:${latestBook.bidRatio.toFixed(1)}%"></div>
+              <div class="imb-ask" style="width:${(100 - latestBook.bidRatio).toFixed(1)}%"></div>
+            </div>
+            <div class="imb-sub" style="margin-bottom:8px">
+              <span class="pos">Chờ mua Top 5: ${latestBook.bidRatio.toFixed(1)}% (${fmtUsd(latestBook.bidDepth5)})</span>
+              <span class="neg">Chờ bán Top 5: ${(100 - latestBook.bidRatio).toFixed(1)}% (${fmtUsd(latestBook.askDepth5)})</span>
+            </div>
+            <div class="ob-grid">
+              <div>
+                <div class="ob-col-lbl"><span>Giá Mua (Bid)</span><span>USD</span></div>
+                ${bidsHtml}
+              </div>
+              <div>
+                <div class="ob-col-lbl"><span>Giá Bán (Ask)</span><span>USD</span></div>
+                ${asksHtml}
+              </div>
+            </div>
+            ${latestBook.crossed ? `<div class="ref-note yel">Lưu ý: Nguồn fullDepth đang có lệnh API chéo bước giá; hãy đối chiếu trực tiếp giá khớp ở tab <b>Lệnh vừa khớp</b>.</div>` : ""}
+          `;
+        }
+      }
+
+      const priceColorCls = lastTrade ? (lastTrade.isSell ? "neg" : "pos") : "";
+      const scoreColorCls = state === "CALM" ? "pos" : (state === "WARN" ? "yel" : (state === "DANGER" ? "neg" : ""));
+
+      document.getElementById("updateTime").innerText =
+        `${selectedToken.symbol} • Cập nhật ${fmtTime(now)} • ${trades15s} lệnh / 15s`;
+      document.getElementById("diagBox").innerText =
+        `Đang theo dõi riêng: ${selectedToken.pair} | Nguồn: ${activeSource} | Mẫu trong ${windowSec}s: ${vals.length}`;
+
+      document.getElementById("mainView").innerHTML = `
+        <div class="card ${state}">
+          <div class="status-banner ${state}">
+            <div>
+              <div class="sb-title ${scoreColorCls}">${bannerTitle}</div>
+              <div class="sb-sub">${bannerSub}</div>
+            </div>
+            <div class="score-ring">
+              <div class="score-num ${scoreColorCls}">${vals.length >= 4 ? score : "--"}</div>
+              <div class="score-lbl">Ổn định</div>
+            </div>
+          </div>
+
+          <div class="coin-head">
+            <div>
+              <div class="coin-name">
+                ${selectedToken.symbol}
+                ${selectedToken.mulPoint >= 4 ? `<span class="mul-x4">x${selectedToken.mulPoint} ĐIỂM</span>` : (selectedToken.mulPoint > 1 ? `<span class="mul">x${selectedToken.mulPoint}</span>` : "")}
+                <span class="pair-tag">${selectedToken.pair}</span>
+              </div>
+              <div class="price-main ${priceColorCls}">${fmtPrice(currentPrice)}</div>
+              <div class="price-sub">
+                Trung bình ${windowSec}s: <strong class="pur">${fmtPrice(meanP)}</strong> • Lệch: <span class="${Math.abs(devMeanPct) <= 0.08 ? 'pos' : (devMeanPct > 0 ? 'blu' : 'neg')}">${devMeanPct >= 0 ? '+' : ''}${devMeanPct.toFixed(3)}%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="kpi-grid">
+            <div class="kpi">
+              <div class="k">Biên độ ${windowSec}s</div>
+              <div class="v ${rangePct <= 0.18 ? 'pos' : (rangePct <= 0.4 ? 'yel' : 'neg')}">${rangePct.toFixed(3)}%</div>
+              <div class="s">Δ ${fmtPrice(rangeAbs)}</div>
+            </div>
+            <div class="kpi">
+              <div class="k">Trượt nền ${windowSec}s</div>
+              <div class="v ${Math.abs(driftPct) <= 0.05 ? 'pos' : (driftPct > 0 ? 'blu' : 'neg')}">${driftPct >= 0 ? '+' : ''}${driftPct.toFixed(3)}%</div>
+              <div class="s">Rung: ±${stdPct.toFixed(3)}%</div>
+            </div>
+            <div class="kpi">
+              <div class="k">Nhịp khớp 15s</div>
+              <div class="v">${trades15s} lệnh</div>
+              <div class="s">${totalTradeUsd > 0 ? fmtUsd(totalTradeUsd) : "Đang đo"}</div>
+            </div>
+          </div>
+
+          <div class="section-box">
+            <div class="sec-head">
+              <span class="pur">Vùng giá neo & Biểu đồ (${windowSec}s gần nhất)</span>
+              <span>Vị trí giá: <strong>${posPct.toFixed(0)}%</strong></span>
+            </div>
+            <div class="range-bar-wrap">
+              <div class="range-prices">
+                <span class="neg">Đáy: ${fmtPrice(minP)}</span>
+                <span class="pur">Giữa: ${fmtPrice(meanP)}</span>
+                <span class="pos">Đỉnh: ${fmtPrice(maxP)}</span>
+              </div>
+              <div class="range-track">
+                <div class="range-mid-mark" style="left:${midPosPct.toFixed(1)}%"></div>
+                <div class="range-dot" style="left:${posPct.toFixed(1)}%;background:${state === 'CALM' ? 'var(--green)' : (state === 'DANGER' ? 'var(--red)' : 'var(--yellow)')}"></div>
+              </div>
+            </div>
+            ${renderSparkline(activePoints, meanP)}
+          </div>
+
+          <div class="section-box">
+            <div class="sec-head">
+              <span class="${buyTradePct >= 55 ? 'pos' : (sellTradePct >= 58 ? 'neg' : 'pur')}">
+                Lực khớp thực tế (${windowSec}s): ${buyTradePct >= 55 ? 'Mua chủ động' : (sellTradePct >= 58 ? 'Bán xả mạnh' : 'Mua – Bán cân bằng')}
+              </span>
+              <span>${recentTrades.length} lệnh</span>
+            </div>
+            <div class="imb-bar">
+              <div class="imb-bid" style="width:${buyTradePct.toFixed(1)}%"></div>
+              <div class="imb-ask" style="width:${sellTradePct.toFixed(1)}%"></div>
+            </div>
+            <div class="imb-sub">
+              <span class="pos">Khớp Mua: ${buyTradePct.toFixed(1)}% (${fmtUsd(buyUsd)})</span>
+              <span class="neg">Khớp Bán: ${sellTradePct.toFixed(1)}% (${fmtUsd(sellUsd)})</span>
+            </div>
+          </div>
+
+          <div class="section-box">
+            <div class="sub-tabs">
+              <button class="sub-tab ${activePanel === 'TAPE' ? 'active' : ''}" onclick="setActivePanel('TAPE')">Lệnh vừa khớp (như Binance)</button>
+              <button class="sub-tab ${activePanel === 'BOOK' ? 'active' : ''}" onclick="setActivePanel('BOOK')">Sổ lệnh chờ Top 5</button>
+            </div>
+            ${bottomPanelHtml}
+          </div>
+
+          <div class="ref-note">
+            Mốc tham khảo (chỉ phản ánh dữ liệu ${windowSec}s vừa qua, không đảm bảo giá không đột ngột xả): vùng giá khớp đang nằm gọn trong khoảng <b>${fmtPrice(minP)} – ${fmtPrice(maxP)}</b>.
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadTokenList(forceReload = false) {
+      if (allTokens.length && !forceReload) return;
+      document.getElementById("updateTime").innerText = "Đang tải danh sách coin...";
+      try {
+        const res = await fetchJsonWithFallback("/api/alpha/token-list", TOKEN_LIST_DIRECT);
+        const rawArr = Array.isArray(res.json.data) ? res.json.data : (Array.isArray(res.json) ? res.json : []);
+
+        const normalized = rawArr
+          .filter(t => !t.offsell && (t.alphaId || t.symbol))
+          .map(t => {
+            const rawAlpha = String(t.alphaId || t.symbol || "").trim();
+            const sym = String(t.symbol || rawAlpha).trim();
+            const pair = rawAlpha.endsWith("USDT") ? rawAlpha : `${rawAlpha}USDT`;
+            const mulVal = Number(t.mulPoint || t.pointMultiplier || 1);
+            return {
+              symbol: sym,
+              alphaId: rawAlpha,
+              pair,
+              mulPoint: Number.isFinite(mulVal) ? mulVal : 1,
+              volume24h: Number(t.volume24h || t.volume || 0)
+            };
+          });
+
+        normalized.sort((a, b) => {
+          const ax4 = a.mulPoint >= 4 ? 0 : 1;
+          const bx4 = b.mulPoint >= 4 ? 0 : 1;
+          if (ax4 !== bx4) return ax4 - bx4;
+          return b.volume24h - a.volume24h;
+        });
+
+        allTokens = normalized;
+        const x4Count = allTokens.filter(t => t.mulPoint >= 4).length;
+        document.getElementById("x4Total").innerText = x4Count;
+        document.getElementById("allTotal").innerText = allTokens.length;
+
+        let savedId = "";
+        try { savedId = localStorage.getItem(STORAGE_KEY) || ""; } catch (_) {}
+        const initial =
+          allTokens.find(t => t.alphaId === savedId) ||
+          allTokens.find(t => t.symbol.toUpperCase() === "UP") ||
+          allTokens.find(t => t.mulPoint >= 4) ||
+          allTokens[0] ||
+          null;
+
+        if (!x4Count) setListFilter("ALL");
+        if (initial) {
+          selectedToken = initial;
+          renderPicker();
+          startCoinStream();
+        } else {
+          throw new Error("Danh sách token rỗng");
+        }
+      } catch (e) {
+        lastErrorText = e && e.message ? e.message : "Lỗi tải danh sách";
+        setConnBadge("LỖI DS", "err");
+        document.getElementById("updateTime").innerText = "Không tải được danh sách coin";
+        document.getElementById("mainView").innerHTML =
+          `<div class="empty">Không tải được danh sách Binance Alpha.<br><span class="neg">Chi tiết: ${lastErrorText}</span><br>Kiểm tra lại file <b>_redirects</b> trên Netlify rồi bấm <b>Tải DS</b>.</div>`;
+      }
+    }
+
+    loadTokenList();
+  </script>
+</body>
+</html>
