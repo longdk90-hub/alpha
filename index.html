@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Alpha Stability" />
-  <title>Alpha Stability — GitHub Pages</title>
+  <title>Alpha Radar — Độ Ổn Định & Sổ Lệnh</title>
   <style>
     :root {
       --bg: #0b0e14;
@@ -61,17 +61,11 @@
     .input-box { margin-bottom: 7px; }
     .select-box { font-weight: 700; }
 
-    .manual-row { display: flex; gap: 6px; margin-top: 7px; }
-    .manual-row input { flex: 1; background: var(--card-2); border: 1px solid var(--border); color: var(--text); padding: 7px 10px; border-radius: 9px; font-size: 13px; outline: none; }
-    .manual-row button { background: var(--blue-bg); color: var(--blue); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 9px; padding: 7px 11px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
-
     .quick-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; margin-top: 8px; }
     .chip { background: var(--card-2); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; display: flex; align-items: center; gap: 4px; }
     .chip.active { background: var(--yellow); color: #000; border-color: var(--yellow); }
     .chip .x4 { font-size: 10px; color: var(--yellow); font-weight: 800; }
     .chip.active .x4 { color: #000; }
-
-    .list-note { font-size: 10.5px; color: var(--muted); margin-top: 6px; }
 
     .ctrl-row { display: flex; justify-content: space-between; align-items: center; margin-top: 9px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); gap: 8px; flex-wrap: wrap; }
     .ctrl-lbl { font-size: 11px; color: var(--muted); }
@@ -156,7 +150,7 @@
   <div class="header">
     <div>
       <h1>ALPHA STABILITY <span class="pill-live rest" id="connPill">ĐANG NỐI</span></h1>
-      <div class="time" id="updateTime">Đang kết nối WebSocket trực tiếp...</div>
+      <div class="time" id="updateTime">Đang tải danh sách coin...</div>
     </div>
     <div class="hdr-actions">
       <button class="btn btn-ghost" id="btnPause" onclick="togglePause()">Tạm dừng</button>
@@ -176,16 +170,11 @@
 
     <input type="search" class="input-box" id="coinSearch" placeholder="Tìm tên coin (VD: UP, RAVE)..." oninput="renderPicker()" />
 
-    <select class="select-box" id="coinSelect" onchange="onSelectCoin(this.value)"></select>
+    <select class="select-box" id="coinSelect" onchange="onSelectCoin(this.value)">
+      <option value="">Đang tải danh sách Binance Alpha...</option>
+    </select>
 
     <div class="quick-chips" id="quickChips"></div>
-
-    <div class="manual-row">
-      <input type="text" id="manualPairInput" placeholder="Nhập mã Alpha trực tiếp (VD: 804 hoặc ALPHA_804)" />
-      <button onclick="applyManualPair()">Chạy ngay</button>
-    </div>
-
-    <div class="list-note" id="listStatus">Đang nối thẳng WebSocket • Tải thêm danh sách coin chạy ngầm...</div>
 
     <div class="ctrl-row">
       <span class="ctrl-lbl">Khung đo độ ổn định:</span>
@@ -197,41 +186,35 @@
     </div>
   </div>
 
-  <div id="mainView"><div class="empty">Đang kết nối WebSocket trực tiếp tới Binance Alpha...</div></div>
-  <div class="diag" id="diagBox">Tối ưu GitHub Pages: Chạy thẳng WebSocket ngay lập tức, không chờ danh sách proxy.</div>
+  <div id="mainView"><div class="empty">Đang tải danh sách coin Binance Alpha...</div></div>
+  <div class="diag" id="diagBox">Ưu tiên kết nối WebSocket trực tiếp (khớp y hệt cột giao dịch trên app Binance).</div>
 
   <script>
     const TOKEN_LIST_DIRECT = "https://www.binance.com/bapi/defi/v1/public/wallet-direct/buw/wallet/cex/alpha/all/token/list";
-    const STORAGE_KEY = "alpha_stability_selected_v9";
-    const CACHE_LIST_KEY = "alpha_stability_token_cache_v9";
-    const IS_STATIC_HOST = /github\.io|gitlab\.io|vercel\.app/i.test(location.hostname) || location.protocol === "file:";
-
-    // Danh sách khởi động sẵn để chạy WebSocket tức thì không cần chờ proxy
-    const BUILTIN_TOKENS = [
-      { symbol: "UP", alphaId: "ALPHA_804", pair: "ALPHA_804USDT", mulPoint: 4, volume24h: 1e9 },
-      { symbol: "RAVE", alphaId: "ALPHA_497", pair: "ALPHA_497USDT", mulPoint: 4, volume24h: 5e8 }
-    ];
+    const STORAGE_KEY = "alpha_stability_selected_v8";
 
     let allTokens = [];
     let listFilter = "X4";
     let selectedToken = null;
     let windowSec = 60;
-    let activePanel = "TAPE";
+    let activePanel = "TAPE"; // TAPE (lệnh khớp xanh/đỏ như ảnh) | BOOK (sổ lệnh Top 5)
     let isPaused = false;
 
-    let trades = [];
-    let pricePoints = [];
-    let latestBook = null;
+    // Dữ liệu thời gian thực của ĐÚNG 1 COIN đang chọn
+    let trades = [];      // [{ id, price, qty, usd, isSell, ts }]
+    let pricePoints = []; // [{ ts, price }] dùng vẽ biểu đồ & đo biến động
+    let latestBook = null; // { bestBid, bestAsk, bids, asks, bidDepth5, askDepth5, bidRatio, spreadPct, crossed, ts }
     let latestKlinePrice = 0;
 
+    // Kết nối WebSocket + dự phòng REST
     let ws = null;
     let wsConnected = false;
     let wsGotMessage = false;
-    let wsReconnectTimer = null;
     let wsFallbackTimer = null;
     let restTimer = null;
     let isRestBusy = false;
-    let activeSource = "WebSocket trực tiếp Binance";
+    let activeSource = "Khởi tạo";
+    let lastErrorText = "";
     let renderScheduled = false;
     let lastRenderTs = 0;
 
@@ -273,82 +256,27 @@
       el.className = "pill-live" + (cls ? " " + cls : "");
     }
 
-    async function fetchWithTimeout(url, timeoutMs = 4500) {
-      const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const res = await fetch(url, { cache: "no-store", signal: controller.signal });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const text = await res.text();
-        const json = JSON.parse(text);
-        if (json && (json.data !== undefined || Array.isArray(json.bids) || Array.isArray(json))) {
-          return json;
-        }
-        throw new Error("Dữ liệu rỗng");
-      } finally {
-        clearTimeout(id);
-      }
-    }
-
-    async function fetchJsonSmart(directPath, binanceDirectUrl, timeoutMs = 4500) {
-      // Trên GitHub Pages bỏ qua /api/alpha/... để không tốn thời gian gọi 404
-      const candidates = [];
-      if (!IS_STATIC_HOST && directPath) {
-        candidates.push({ url: directPath, label: "Netlify _redirects" });
-      }
-      candidates.push(
-        { url: binanceDirectUrl, label: "Binance trực tiếp" },
-        { url: `https://corsproxy.io/?url=${encodeURIComponent(binanceDirectUrl)}`, label: "corsproxy.io" },
-        { url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(binanceDirectUrl)}`, label: "codetabs" },
-        { url: `https://api.allorigins.win/raw?url=${encodeURIComponent(binanceDirectUrl)}`, label: "allorigins" }
-      );
-
-      // Nếu là Netlify, thử _redirects trước; trên GitHub Pages đua song song các nguồn để lấy nguồn nhanh nhất
-      if (!IS_STATIC_HOST && directPath) {
+    async function fetchJsonWithFallback(directPath, binanceDirectUrl) {
+      const candidates = [
+        directPath,
+        `https://corsproxy.io/?${encodeURIComponent(binanceDirectUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(binanceDirectUrl)}`
+      ];
+      let lastErr = null;
+      for (const u of candidates) {
         try {
-          const json = await fetchWithTimeout(directPath, timeoutMs);
-          return { json, source: "Netlify _redirects" };
-        } catch (_) {}
+          const res = await fetch(u, { cache: "no-store" });
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const json = await res.json();
+          if (json && (json.data !== undefined || Array.isArray(json.bids) || Array.isArray(json))) {
+            return { json, source: u.startsWith("/") ? "Netlify _redirects" : new URL(u).hostname };
+          }
+          throw new Error("Dữ liệu rỗng");
+        } catch (err) {
+          lastErr = err;
+        }
       }
-
-      const pool = candidates.filter(c => c.url !== directPath);
-      return await new Promise((resolve, reject) => {
-        let pending = pool.length;
-        let done = false;
-        let lastErr = new Error("Tất cả proxy đều bận hoặc bị chặn");
-        pool.forEach(c => {
-          fetchWithTimeout(c.url, timeoutMs)
-            .then(json => {
-              if (!done) {
-                done = true;
-                resolve({ json, source: c.label });
-              }
-            })
-            .catch(err => {
-              lastErr = err;
-              pending--;
-              if (!done && pending <= 0) reject(lastErr);
-            });
-        });
-      });
-    }
-
-    function mergeTokens(incoming) {
-      const map = new Map();
-      for (const t of BUILTIN_TOKENS) map.set(t.alphaId, { ...t });
-      for (const t of allTokens) map.set(t.alphaId, { ...t });
-      for (const t of incoming) map.set(t.alphaId, { ...t });
-      const arr = Array.from(map.values());
-      arr.sort((a, b) => {
-        const ax4 = a.mulPoint >= 4 ? 0 : 1;
-        const bx4 = b.mulPoint >= 4 ? 0 : 1;
-        if (ax4 !== bx4) return ax4 - bx4;
-        return (b.volume24h || 0) - (a.volume24h || 0);
-      });
-      allTokens = arr;
-      const x4Count = allTokens.filter(t => t.mulPoint >= 4).length;
-      document.getElementById("x4Total").innerText = x4Count;
-      document.getElementById("allTotal").innerText = allTokens.length;
+      throw lastErr || new Error("Không kết nối được");
     }
 
     function setListFilter(mode) {
@@ -377,7 +305,7 @@
       btn.innerText = isPaused ? "Tiếp tục" : "Tạm dừng";
       btn.className = isPaused ? "btn btn-paused" : "btn btn-ghost";
       if (!isPaused && selectedToken) {
-        if (!wsConnected) startCoinStream();
+        if (!wsConnected && !restTimer) startCoinStream();
         scheduleRender(true);
       }
     }
@@ -386,9 +314,10 @@
       trades = [];
       pricePoints = [];
       latestBook = null;
+      lastErrorText = "";
       if (selectedToken) {
         document.getElementById("mainView").innerHTML =
-          `<div class="empty">Đã đặt lại bộ đo. Đang nhận lệnh khớp mới cho <b>${selectedToken.symbol}</b>...</div>`;
+          `<div class="empty">Đã đặt lại bộ đo. Đang đọc dữ liệu mới cho <b>${selectedToken.symbol}</b>...</div>`;
         startCoinStream();
       }
     }
@@ -441,41 +370,16 @@
       pricePoints = [];
       latestBook = null;
       latestKlinePrice = 0;
+      lastErrorText = "";
       try { localStorage.setItem(STORAGE_KEY, found.alphaId); } catch (_) {}
       renderPicker();
       document.getElementById("mainView").innerHTML =
-        `<div class="empty">Đang kết nối WebSocket trực tiếp cho <b>${found.symbol}</b> (${found.pair})...</div>`;
+        `<div class="empty">Đang kết nối dữ liệu khớp lệnh & sổ lệnh cho <b>${found.symbol}</b> (${found.pair})...</div>`;
       startCoinStream();
-    }
-
-    function applyManualPair() {
-      const raw = (document.getElementById("manualPairInput").value || "").trim().toUpperCase();
-      if (!raw) return;
-      // Hỗ trợ gõ: "804", "ALPHA_804", "ALPHA_804USDT", hoặc tên coin trong danh sách như "UP"
-      const bySym = allTokens.find(t => t.symbol.toUpperCase() === raw || t.alphaId.toUpperCase() === raw || t.pair.toUpperCase() === raw);
-      if (bySym) {
-        onSelectCoin(bySym.alphaId);
-        document.getElementById("manualPairInput").value = "";
-        return;
-      }
-      let alphaId = raw.replace(/USDT$/, "");
-      if (/^\d+$/.test(alphaId)) alphaId = "ALPHA_" + alphaId;
-      else if (!alphaId.startsWith("ALPHA_")) alphaId = "ALPHA_" + alphaId;
-      const custom = {
-        symbol: alphaId,
-        alphaId,
-        pair: `${alphaId}USDT`,
-        mulPoint: 4,
-        volume24h: 0
-      };
-      mergeTokens([custom]);
-      onSelectCoin(custom.alphaId);
-      document.getElementById("manualPairInput").value = "";
     }
 
     function stopCoinStream() {
       if (wsFallbackTimer) { clearTimeout(wsFallbackTimer); wsFallbackTimer = null; }
-      if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
       if (restTimer) { clearInterval(restTimer); restTimer = null; }
       if (ws) {
         try { ws.onclose = null; ws.onerror = null; ws.onmessage = null; ws.close(); } catch (_) {}
@@ -500,6 +404,7 @@
         isSell: Boolean(isSell),
         ts: tradeTs
       });
+      // Giữ lịch sử tối đa 5 phút hoặc 600 lệnh gần nhất
       const cutoff = Date.now() - 300000;
       if (trades.length > 600) trades = trades.slice(-600);
       while (trades.length > 80 && trades[0].ts < cutoff) trades.shift();
@@ -515,6 +420,7 @@
       let asks = rawAsks.map(x => [Number(x[0]), Number(x[1])]).filter(x => x[0] > 0 && x[1] > 0).sort((a, b) => a[0] - b[0]);
       if (!bids.length || !asks.length) return;
 
+      // Nếu đã có giá khớp thật, lọc bớt các mức giá lệch quá xa (>15%) để tránh nhiễu
       if (refPrice > 0) {
         const cleanBids = bids.filter(x => Math.abs(x[0] - refPrice) / refPrice <= 0.15);
         const cleanAsks = asks.filter(x => Math.abs(x[0] - refPrice) / refPrice <= 0.15);
@@ -547,6 +453,7 @@
         ts: Date.now()
       };
 
+      // Chỉ dùng giá giữa sổ lệnh cho biểu đồ nếu chưa có bất kỳ lệnh khớp thật nào và sổ lệnh không bị chéo
       if (!trades.length && !crossed) {
         const mid = (bestBid + bestAsk) / 2;
         pricePoints.push({ ts: Date.now(), price: mid });
@@ -561,9 +468,12 @@
       const pair = selectedToken.pair;
       const pairLower = pair.toLowerCase();
       setConnBadge("ĐANG NỐI WS", "rest");
-      document.getElementById("updateTime").innerText = `Đang nối WebSocket cho ${selectedToken.symbol} (${pair})...`;
+      document.getElementById("updateTime").innerText = `Đang nối luồng trực tiếp cho ${selectedToken.symbol}...`;
 
-      // Kết nối WebSocket trực tiếp Binance Alpha (không cần proxy)
+      // Tải nhanh snapshot ban đầu (lịch sử khớp + sổ lệnh) để có số liệu ngay lập tức không phải chờ
+      pollRestOnce(true);
+
+      // Ưu tiên WebSocket trực tiếp của Binance Alpha (không qua proxy)
       try {
         const wsUrl = `wss://nbstream.binance.com/w3w/wsa/stream?streams=${pairLower}@aggTrade/${pairLower}@depth5@100ms`;
         ws = new WebSocket(wsUrl);
@@ -572,6 +482,7 @@
           wsConnected = true;
           activeSource = "WebSocket trực tiếp Binance";
           setConnBadge("LIVE WS", "");
+          // Gửi thêm lệnh SUBSCRIBE dự phòng nếu endpoint yêu cầu subscribe tường minh
           try {
             ws.send(JSON.stringify({
               method: "SUBSCRIBE",
@@ -593,7 +504,6 @@
             activeSource = "WebSocket trực tiếp Binance";
             setConnBadge("LIVE WS", "");
             if (wsFallbackTimer) { clearTimeout(wsFallbackTimer); wsFallbackTimer = null; }
-            if (restTimer) { clearInterval(restTimer); restTimer = null; }
 
             if (streamName.includes("aggtrade") || payload.e === "aggTrade" || (payload.p && payload.q && payload.T)) {
               ingestTrade(
@@ -614,64 +524,113 @@
 
         ws.onerror = () => {
           wsConnected = false;
+          activateRestFallback();
         };
 
         ws.onclose = () => {
           wsConnected = false;
-          if (!isPaused) {
-            setConnBadge("NỐI LẠI WS", "rest");
-            wsReconnectTimer = setTimeout(() => {
-              if (!isPaused && !wsConnected) startCoinStream();
-            }, 3000);
-          }
+          if (!isPaused) activateRestFallback();
         };
       } catch (_) {
         activateRestFallback();
       }
 
-      // Chỉ gọi REST lấy snapshot dự phòng nếu sau 5 giây chưa có gói WebSocket nào
+      // Nếu sau 4.5 giây WebSocket chưa nhận được gói tin nào, tự chuyển sang REST polling
       wsFallbackTimer = setTimeout(() => {
         if (!wsGotMessage) activateRestFallback();
-      }, 5000);
+      }, 4500);
     }
 
     function activateRestFallback() {
       if (restTimer) return;
-      setConnBadge("REST 3S", "rest");
-      pollRestOnce();
+      setConnBadge("REST 2S", "rest");
+      pollRestOnce(false);
       restTimer = setInterval(() => {
-        if (!isPaused && !wsGotMessage) pollRestOnce();
-      }, 3000);
+        if (!isPaused && !wsGotMessage) pollRestOnce(false);
+      }, 2000);
     }
 
-    async function pollRestOnce() {
-      if (isRestBusy || !selectedToken || isPaused) return;
+    async function pollRestOnce(isInitial) {
+      if (isRestBusy || !selectedToken) return;
+      if (isPaused && !isInitial) return;
       isRestBusy = true;
       const pair = selectedToken.pair;
       let gotAny = false;
+      let errMsg = "";
+
       try {
-        const aggDirect = `https://www.binance.com/bapi/defi/v1/public/alpha-trade/agg-trades?symbol=${encodeURIComponent(pair)}&limit=40`;
-        const resAgg = await fetchJsonSmart(`/api/alpha/agg-trades?symbol=${encodeURIComponent(pair)}&limit=40`, aggDirect, 4500);
-        const arr = Array.isArray(resAgg.json.data) ? resAgg.json.data : (Array.isArray(resAgg.json) ? resAgg.json : []);
-        if (arr.length) {
-          arr.sort((a, b) => Number(a.T || a.time || 0) - Number(b.T || b.time || 0));
-          for (const item of arr) {
-            ingestTrade(
-              item.a || item.id,
-              Number(item.p || item.price),
-              Number(item.q || item.qty),
-              Boolean(item.m !== undefined ? item.m : item.isBuyerMaker),
-              Number(item.T || item.time || Date.now())
-            );
+        // 1. Thử lấy bảng lệnh khớp thật (agg-trades)
+        try {
+          const aggDirect = `https://www.binance.com/bapi/defi/v1/public/alpha-trade/agg-trades?symbol=${encodeURIComponent(pair)}&limit=60`;
+          const resAgg = await fetchJsonWithFallback(`/api/alpha/agg-trades?symbol=${encodeURIComponent(pair)}&limit=60`, aggDirect);
+          const arr = Array.isArray(resAgg.json.data) ? resAgg.json.data : (Array.isArray(resAgg.json) ? resAgg.json : []);
+          if (arr.length) {
+            arr.sort((a, b) => Number(a.T || a.time || 0) - Number(b.T || b.time || 0));
+            for (const item of arr) {
+              ingestTrade(
+                item.a || item.id,
+                Number(item.p || item.price),
+                Number(item.q || item.qty),
+                Boolean(item.m !== undefined ? item.m : item.isBuyerMaker),
+                Number(item.T || item.time || Date.now())
+              );
+            }
+            if (!wsGotMessage) activeSource = `REST agg-trades (${resAgg.source})`;
+            gotAny = true;
           }
-          if (!wsGotMessage) activeSource = `REST (${resAgg.source})`;
+        } catch (e) {
+          errMsg = e.message;
+        }
+
+        // 2. Lấy thêm sổ lệnh (fullDepth) và kline gần nhất (đều đã có sẵn trong _redirects cũ)
+        const depthDirect = `https://www.binance.com/bapi/defi/v1/public/alpha-trade/fullDepth?symbol=${encodeURIComponent(pair)}&limit=20`;
+        const klineDirect = `https://www.binance.com/bapi/defi/v1/public/alpha-trade/klines?symbol=${encodeURIComponent(pair)}&interval=1m&limit=5`;
+
+        const [kRes, dRes] = await Promise.allSettled([
+          fetchJsonWithFallback(`/api/alpha/klines?symbol=${encodeURIComponent(pair)}&interval=1m&limit=5`, klineDirect),
+          fetchJsonWithFallback(`/api/alpha/depth?symbol=${encodeURIComponent(pair)}&limit=20`, depthDirect)
+        ]);
+
+        if (kRes.status === "fulfilled") {
+          const kArr = Array.isArray(kRes.value.json.data) ? kRes.value.json.data : [];
+          if (kArr.length) {
+            const lastK = kArr[kArr.length - 1];
+            const closeP = Number(lastK[4]);
+            if (closeP > 0) {
+              latestKlinePrice = closeP;
+              if (!trades.length) {
+                pricePoints.push({ ts: Date.now(), price: closeP });
+                if (pricePoints.length > 300) pricePoints.shift();
+              }
+              if (!wsGotMessage && !gotAny) activeSource = `REST klines+depth (${kRes.value.source})`;
+              gotAny = true;
+            }
+          }
+        }
+
+        if (dRes.status === "fulfilled") {
+          const dData = dRes.value.json.data || dRes.value.json || {};
+          const refP = trades.length ? trades[trades.length - 1].price : latestKlinePrice;
+          ingestBook(dData.bids || [], dData.asks || [], refP);
+          if (!wsGotMessage && !gotAny) activeSource = `REST depth (${dRes.value.source})`;
           gotAny = true;
         }
-        if (gotAny) scheduleRender(true);
+
+        if (!gotAny) {
+          throw new Error(errMsg || "Không đọc được dữ liệu Binance Alpha");
+        }
+
+        lastErrorText = "";
+        scheduleRender(true);
       } catch (e) {
-        if (!wsGotMessage && !trades.length && !latestBook) {
-          setConnBadge("CHỜ LỆNH", "err");
-          document.getElementById("updateTime").innerText = `Chưa có lệnh mới cho ${selectedToken.symbol}`;
+        lastErrorText = e && e.message ? e.message : "Lỗi kết nối";
+        if (!wsGotMessage) {
+          setConnBadge("LỖI NỐI", "err");
+          document.getElementById("updateTime").innerText = `Lỗi đọc dữ liệu ${selectedToken.symbol}`;
+        }
+        if (!trades.length && !latestBook) {
+          document.getElementById("mainView").innerHTML =
+            `<div class="empty">Chưa lấy được dữ liệu cho <b>${selectedToken.symbol}</b> (${pair}).<br><span class="neg">Chi tiết: ${lastErrorText}</span><br>Hãy kiểm tra lại file <b>_redirects</b> rồi bấm <b>Đặt lại</b>.</div>`;
         }
       } finally {
         isRestBusy = false;
@@ -730,6 +689,7 @@
       const now = Date.now();
       const cutoff = now - windowSec * 1000;
 
+      // Lọc các lệnh và điểm giá trong đúng khung thời gian đang chọn (30s / 60s / 2 phút)
       const winTrades = trades.filter(t => t.ts >= cutoff);
       const recentTrades = winTrades.length >= 3 ? winTrades : trades.slice(-30);
       const winPoints = pricePoints.filter(p => p.ts >= cutoff);
@@ -752,31 +712,42 @@
       const rangePct = minP > 0 ? (rangeAbs / minP) * 100 : 0;
       const devMeanPct = meanP > 0 ? ((currentPrice - meanP) / meanP) * 100 : 0;
 
+      // Tính độ lệch chuẩn (volatility) & tốc độ đổi hướng (dao động qua lại)
       const variance = vals.reduce((s, v) => s + Math.pow(((v - meanP) / meanP) * 100, 2), 0) / vals.length;
       const stdPct = Math.sqrt(variance);
 
+      // Xu hướng ngắn hạn: so sánh nửa đầu và nửa sau của khung thời gian
       const halfIdx = Math.max(1, Math.floor(vals.length / 2));
       const firstAvg = vals.slice(0, halfIdx).reduce((a, b) => a + b, 0) / halfIdx;
       const secondAvg = vals.slice(halfIdx).reduce((a, b) => a + b, 0) / Math.max(1, vals.length - halfIdx);
       const driftPct = firstAvg > 0 ? ((secondAvg - firstAvg) / firstAvg) * 100 : 0;
 
+      // Tỷ lệ mua / bán khớp thật trong khung thời gian
       const buyUsd = recentTrades.filter(t => !t.isSell).reduce((s, t) => s + t.usd, 0);
       const sellUsd = recentTrades.filter(t => t.isSell).reduce((s, t) => s + t.usd, 0);
       const totalTradeUsd = buyUsd + sellUsd;
       const buyTradePct = totalTradeUsd > 0 ? (buyUsd / totalTradeUsd) * 100 : 50;
       const sellTradePct = 100 - buyTradePct;
 
+      // Đếm lệnh khớp trong 15 giây gần nhất (đo độ sôi động)
       const trades15s = trades.filter(t => t.ts >= now - 15000).length;
 
+      // Vị trí giá hiện tại trong biên Min - Max (0% = sát đáy, 100% = sát đỉnh)
       const posPct = rangeAbs > 0 ? Math.max(0, Math.min(100, ((currentPrice - minP) / rangeAbs) * 100)) : 50;
       const midPosPct = rangeAbs > 0 ? Math.max(0, Math.min(100, ((meanP - minP) / rangeAbs) * 100)) : 50;
 
+      // Tính ĐIỂM ỔN ĐỊNH (0 - 100) chuyên cho kiểu chạy Lệnh đảo ngược sát biên
       let score = 100;
+      // 1. Trừ điểm theo biên độ % trong khung đo
       if (rangePct > 0.08) score -= Math.min(45, (rangePct - 0.08) * 110);
+      // 2. Trừ điểm theo độ trượt xu hướng (nếu đang tụt nền mạnh thì trừ nặng hơn)
       if (driftPct < -0.04) score -= Math.min(30, Math.abs(driftPct) * 180);
       else if (Math.abs(driftPct) > 0.08) score -= Math.min(15, Math.abs(driftPct) * 70);
+      // 3. Trừ điểm nếu lực bán khớp áp đảo mạnh
       if (totalTradeUsd > 0 && sellTradePct > 62) score -= Math.min(25, (sellTradePct - 62) * 1.1);
+      // 4. Trừ điểm nếu giá hiện tại đang ép sát đáy khung (< 15%) và bị trượt âm
       if (posPct < 15 && driftPct < -0.03) score -= 12;
+      // 5. Trừ điểm nếu có sổ lệnh bị giãn spread lớn
       if (latestBook && !latestBook.crossed && latestBook.spreadPct > 0.25) {
         score -= Math.min(15, (latestBook.spreadPct - 0.25) * 40);
       }
@@ -802,11 +773,12 @@
         }
       }
 
+      // Nội dung bảng dưới: Tab 1 = Bảng lệnh khớp xanh/đỏ (giống ảnh Binance), Tab 2 = Sổ lệnh Top 5 Bid/Ask
       let bottomPanelHtml = "";
       if (activePanel === "TAPE") {
         const displayTrades = [...trades].reverse().slice(0, 22);
         if (!displayTrades.length) {
-          bottomPanelHtml = `<div class="ref-note">Đang chờ gói lệnh khớp trực tiếp (aggTrade)... Bạn có thể bấm sang tab <b>Sổ lệnh chờ Top 5</b> để xem lệnh chờ.</div>`;
+          bottomPanelHtml = `<div class="ref-note">Đang chờ gói lệnh khớp trực tiếp (aggTrade)... Bạn có thể bấm sang tab <b>Sổ lệnh Top 5</b> để xem lệnh chờ.</div>`;
         } else {
           bottomPanelHtml = `
             <div class="tape-head">
@@ -863,6 +835,7 @@
                 ${asksHtml}
               </div>
             </div>
+            ${latestBook.crossed ? `<div class="ref-note yel">Lưu ý: Nguồn fullDepth đang có lệnh API chéo bước giá; hãy đối chiếu trực tiếp giá khớp ở tab <b>Lệnh vừa khớp</b>.</div>` : ""}
           `;
         }
       }
@@ -965,17 +938,17 @@
           </div>
 
           <div class="ref-note">
-            Mốc tham khảo (phản ánh ${windowSec}s vừa qua): vùng giá khớp nằm trong khoảng <b>${fmtPrice(minP)} – ${fmtPrice(maxP)}</b>.
+            Mốc tham khảo (chỉ phản ánh dữ liệu ${windowSec}s vừa qua, không đảm bảo giá không đột ngột xả): vùng giá khớp đang nằm gọn trong khoảng <b>${fmtPrice(minP)} – ${fmtPrice(maxP)}</b>.
           </div>
         </div>
       `;
     }
 
     async function loadTokenList(forceReload = false) {
-      const statusEl = document.getElementById("listStatus");
-      statusEl.innerText = "Đang tải thêm danh sách đầy đủ từ Binance Alpha...";
+      if (allTokens.length && !forceReload) return;
+      document.getElementById("updateTime").innerText = "Đang tải danh sách coin...";
       try {
-        const res = await fetchJsonSmart("/api/alpha/token-list", TOKEN_LIST_DIRECT, 5000);
+        const res = await fetchJsonWithFallback("/api/alpha/token-list", TOKEN_LIST_DIRECT);
         const rawArr = Array.isArray(res.json.data) ? res.json.data : (Array.isArray(res.json) ? res.json : []);
 
         const normalized = rawArr
@@ -994,50 +967,45 @@
             };
           });
 
-        if (!normalized.length) throw new Error("Danh sách rỗng");
+        normalized.sort((a, b) => {
+          const ax4 = a.mulPoint >= 4 ? 0 : 1;
+          const bx4 = b.mulPoint >= 4 ? 0 : 1;
+          if (ax4 !== bx4) return ax4 - bx4;
+          return b.volume24h - a.volume24h;
+        });
 
-        mergeTokens(normalized);
-        try { localStorage.setItem(CACHE_LIST_KEY, JSON.stringify(allTokens)); } catch (_) {}
+        allTokens = normalized;
+        const x4Count = allTokens.filter(t => t.mulPoint >= 4).length;
+        document.getElementById("x4Total").innerText = x4Count;
+        document.getElementById("allTotal").innerText = allTokens.length;
 
-        // Đồng bộ lại thông tin (như tên symbol / hệ số x4) của coin đang xem nếu vừa tải xong
-        if (selectedToken) {
-          const updated = allTokens.find(t => t.alphaId === selectedToken.alphaId);
-          if (updated) selectedToken = updated;
+        let savedId = "";
+        try { savedId = localStorage.getItem(STORAGE_KEY) || ""; } catch (_) {}
+        const initial =
+          allTokens.find(t => t.alphaId === savedId) ||
+          allTokens.find(t => t.symbol.toUpperCase() === "UP") ||
+          allTokens.find(t => t.mulPoint >= 4) ||
+          allTokens[0] ||
+          null;
+
+        if (!x4Count) setListFilter("ALL");
+        if (initial) {
+          selectedToken = initial;
+          renderPicker();
+          startCoinStream();
+        } else {
+          throw new Error("Danh sách token rỗng");
         }
-        renderPicker();
-        statusEl.innerText = `Đã tải xong ${allTokens.length} coin (${res.source}).`;
       } catch (e) {
-        statusEl.innerText = "Proxy tải danh sách đang bận — WebSocket vẫn chạy bình thường. Bạn chọn coin sẵn có hoặc nhập mã Alpha bên trên.";
+        lastErrorText = e && e.message ? e.message : "Lỗi tải danh sách";
+        setConnBadge("LỖI DS", "err");
+        document.getElementById("updateTime").innerText = "Không tải được danh sách coin";
+        document.getElementById("mainView").innerHTML =
+          `<div class="empty">Không tải được danh sách Binance Alpha.<br><span class="neg">Chi tiết: ${lastErrorText}</span><br>Kiểm tra lại file <b>_redirects</b> trên Netlify rồi bấm <b>Tải DS</b>.</div>`;
       }
     }
 
-    function bootstrap() {
-      // 1. Nạp ngay danh sách sẵn có + bộ nhớ đệm để kết nối WebSocket tức thì (0 giây chờ)
-      let cached = [];
-      try {
-        const raw = localStorage.getItem(CACHE_LIST_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) cached = parsed;
-        }
-      } catch (_) {}
-      mergeTokens(cached);
-
-      let savedId = "";
-      try { savedId = localStorage.getItem(STORAGE_KEY) || ""; } catch (_) {}
-      selectedToken =
-        allTokens.find(t => t.alphaId === savedId) ||
-        allTokens.find(t => t.symbol.toUpperCase() === "UP") ||
-        allTokens[0];
-
-      renderPicker();
-      startCoinStream(); // Bắt đầu chạy LIVE WS ngay lập tức
-
-      // 2. Tải danh sách coin đầy đủ chạy ngầm (không chặn WebSocket)
-      loadTokenList(false);
-    }
-
-    bootstrap();
+    loadTokenList();
   </script>
 </body>
 </html>
